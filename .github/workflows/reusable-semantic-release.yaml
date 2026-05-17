@@ -1,0 +1,98 @@
+name: Run Semantic Release
+
+on:
+  workflow_call:
+    inputs:
+      dry_run:
+        description: 'Run in dry‑run mode (no release published)'
+        type: boolean
+        default: false
+      image:
+        description: 'Docker image containing semantic-release'
+        type: string
+        default: 'docker.io/plushguardian/semantic-release-for-ci:1.0.2'
+    secrets:
+      gh_token:
+        required: true
+    outputs:
+      new_version:
+        description: 'The newly created version tag (e.g., v1.2.3)'
+        value: ${{ jobs.run-semantic-release.outputs.new_version }}
+      release_published:
+        description: 'Whether a new release was published in this run'
+        value: ${{ jobs.run-semantic-release.outputs.release_published }}
+      release_notes:
+        description: 'Release notes (only populated in dry‑run mode)'
+        value: ${{ jobs.run-semantic-release.outputs.release_notes }}
+
+jobs:
+  run-semantic-release:
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ inputs.image }}
+    outputs:
+      new_version: ${{ steps.extract_results.outputs.new_version }}
+      release_published: ${{ steps.extract_results.outputs.release_published }}
+      release_notes: ${{ steps.extract_results.outputs.release_notes }}
+    steps:
+      - name: Checkout code (full history)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+
+      - name: Mark workspace as Git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # ── Run semantic‑release  ──────────────────────
+      - name: Run semantic-release
+        id: run_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.gh_token }}
+        run: |
+          set +e
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            GITHUB_REF=${{ github.head_ref }}
+            npx semantic-release --no-ci --dry-run \
+              --branches ${{ github.head_ref }} > semrel-output.txt
+          else
+            npx semantic-release > semrel-output.txt
+          fi
+          exit_code=$?
+          cat semrel-output.txt
+          set -e
+          echo "exit_code=${exit_code}" >> $GITHUB_OUTPUT
+        shell: sh
+
+
+      # ── Parse output ────────────────────────────────
+
+      - name: Extract Release Results
+        id: extract_results
+        run: |
+          VERSION_LINE=$(grep "The next release version is" semrel-output.txt || true)
+
+          if [ -n "$VERSION_LINE" ]; then
+            NEW_VERSION=$(echo "$VERSION_LINE" | awk '{print $NF}')
+
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "release_published=true" >> $GITHUB_OUTPUT
+            echo "Detected Release: $NEW_VERSION"
+
+            notes=$(awk '/Release note for version/{flag=1; next} flag' semrel-output.txt)
+            echo "$notes" > release-notes.md
+            echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+            cat release-notes.md >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "Release notes: $notes"
+
+          elif grep -qE "no commits that would trigger a release|no relevant changes|no release" semrel-output.txt; then
+            echo "new_version=" >> $GITHUB_OUTPUT
+            echo "release_published=false" >> $GITHUB_OUTPUT
+            echo "No release generated (commit history does not trigger a version bump)."
+
+          # 3. If neither, something went wrong (e.g., auth failure, crash)
+          else
+            echo "ERROR: Could not find release status in semantic-release output."
+            exit 1
+          fi

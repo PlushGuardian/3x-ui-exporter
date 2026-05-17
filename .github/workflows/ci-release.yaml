@@ -1,0 +1,68 @@
+name: Release
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  semantic:
+    uses: ./.github/workflows/reusable-semantic-release.yaml
+    secrets:
+      gh_token: ${{ secrets.GH_RELEASE_PAT }}
+
+  # docker-build-and-push:
+  #   needs: semantic
+  #   if: needs.semantic.outputs.release_published == 'true'
+  #   uses: ./.github/workflows/reusable-docker-build-and-push.yaml
+  #   with:
+  #     version: ${{ needs.semantic.outputs.new_version }}
+  #     commit_sha: ${{ github.sha }}
+  #     dockerhub_repository: "obfs-exporter"
+  #     architectures: |
+  #       [
+  #         {"os":"linux","arch":"amd64"},
+  #         {"os":"linux","arch":"arm64"},
+  #         {"os":"linux","arch":"arm","goarm":"7"}
+  #       ]
+  #     dockerhub_username: ${{ vars.DOCKERHUB_USERNAME }}
+  #   secrets:
+  #     dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  binaries:
+    needs: semantic
+    if: needs.semantic.outputs.release_published == 'true'
+    uses: ./.github/workflows/reusable-binaries.yaml
+    with:
+      version: ${{ needs.semantic.outputs.new_version }}
+      commit_sha: ${{ github.sha }}
+      binary_name: "obfs-exporter"
+      architectures: |
+        [
+          {"os":"linux","arch":"amd64"},
+          {"os":"linux","arch":"arm64"},
+          {"os":"linux","arch":"arm","goarm":"7"}
+        ]
+
+  attach-binaries-to-release:
+    if: needs.semantic.outputs.release_published == 'true'
+    needs:
+      - binaries
+      - semantic
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: obfs-exporter-*
+          merge-multiple: true
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.semantic.outputs.new_version }}
+          files: artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_RELEASE_PAT }}

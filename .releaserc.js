@@ -4,6 +4,7 @@ module.exports = {
   plugins: [
     '@semantic-release/commit-analyzer',
     ['@semantic-release/release-notes-generator', {
+      headerPartial: '',
       writerOpts: {
         commitGroupsSort: (a, b) => {
           const order = ['◈ Features', '⚒ Fixes', '⧖ Performance', '✍ Documentation', '↻ Refactoring', '⚑ Tests', '⚙ Build', '⇉ CI', '☑ Chores'];

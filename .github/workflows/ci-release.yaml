@@ -27,6 +27,7 @@ jobs:
           {"os":"linux","arch":"arm","goarm":"7"}
         ]
       dockerhub_username: ${{ vars.DOCKERHUB_USERNAME }}
+      dockerfile: "./cmd/x-ui-exporter/Dockerfile"
     secrets:
       dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
 

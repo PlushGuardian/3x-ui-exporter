@@ -12,23 +12,23 @@ jobs:
     secrets:
       gh_token: ${{ secrets.GH_RELEASE_PAT }}
 
-  # docker-build-and-push:
-  #   needs: semantic
-  #   if: needs.semantic.outputs.release_published == 'true'
-  #   uses: ./.github/workflows/reusable-docker-build-and-push.yaml
-  #   with:
-  #     version: ${{ needs.semantic.outputs.new_version }}
-  #     commit_sha: ${{ github.sha }}
-  #     dockerhub_repository: "obfs-exporter"
-  #     architectures: |
-  #       [
-  #         {"os":"linux","arch":"amd64"},
-  #         {"os":"linux","arch":"arm64"},
-  #         {"os":"linux","arch":"arm","goarm":"7"}
-  #       ]
-  #     dockerhub_username: ${{ vars.DOCKERHUB_USERNAME }}
-  #   secrets:
-  #     dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+  docker-build-and-push:
+    needs: semantic
+    if: needs.semantic.outputs.release_published == 'true'
+    uses: ./.github/workflows/reusable-docker-build-and-push.yaml
+    with:
+      version: ${{ needs.semantic.outputs.new_version }}
+      commit_sha: ${{ github.sha }}
+      dockerhub_repository: "3x-ui-exporter"
+      architectures: |
+        [
+          {"os":"linux","arch":"amd64"},
+          {"os":"linux","arch":"arm64"},
+          {"os":"linux","arch":"arm","goarm":"7"}
+        ]
+      dockerhub_username: ${{ vars.DOCKERHUB_USERNAME }}
+    secrets:
+      dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
 
   binaries:
     needs: semantic

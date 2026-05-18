@@ -1,0 +1,95 @@
+name: Docker Build And Push
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      commit_sha:
+        required: true
+        type: string
+      architectures:
+        required: false
+        type: string
+      dockerhub_repository:
+        required: true
+        type: string
+      dockerhub_username:
+        required: true
+        type: string
+    secrets:
+      dockerhub_token:
+        required: true
+
+jobs:
+  docker-build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ inputs.dockerhub_username }}
+          password: ${{ secrets.dockerhub_token }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ inputs.dockerhub_username }}/${{ inputs.dockerhub_repository }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ inputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
+            type=semver,pattern={{major}},value=${{ inputs.version }}
+            type=raw,value=latest
+
+      - name: Generate Docker platform list
+        id: platforms
+        env:
+          ARCH_JSON: ${{ inputs.architectures }}
+        run: |
+          platforms=$(jq -r '
+            [.[] |
+              if .arch == "arm" and .goarm then
+                "linux/arm/v\(.goarm)"
+              elif .arch == "arm" then
+                "linux/arm"
+              else
+                "\(.os)/\(.arch)"
+              end
+            ] | join(",")
+          ' <<< "$ARCH_JSON")
+          echo "platforms=${platforms}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Print Docker build configuration
+        run: |
+          echo "::group::Docker Build Configuration"
+          echo "  Image:              ${{ inputs.dockerhub_username }}/${{ inputs.dockerhub_repository }}"
+          echo "  Version tag:        ${{ inputs.version }}"
+          echo "  Commit SHA:         ${{ inputs.commit_sha }}"
+          echo "  Docker platforms:   ${{ steps.platforms.outputs.platforms }}"
+          echo "  Image tags:"
+          echo "${{ steps.meta.outputs.tags }}" | sed 's/^/    /'
+          echo "  Image labels:"
+          echo "${{ steps.meta.outputs.labels }}" | sed 's/^/    /'
+          echo "  Build args:"
+          echo "    GIT_TAG=${{ inputs.version }}"
+          echo "    GIT_COMMIT=${{ inputs.commit_sha }}"
+          echo "::endgroup::"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: ${{ inputs.platforms }}
+          build-args: |
+            GIT_TAG=${{ inputs.version }}
+            GIT_COMMIT=${{ inputs.commit_sha }}

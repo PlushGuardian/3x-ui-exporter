@@ -1,0 +1,61 @@
+name: Pull request
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions: write-all
+
+jobs:
+  golangci-lint:
+    uses: ./.github/workflows/reusable-golangci-lint.yaml
+
+  preview-semantic-release:
+    uses: ./.github/workflows/reusable-semantic-release.yaml
+    with:
+      dry_run: true
+    secrets:
+      gh_token: ${{ secrets.GH_RELEASE_PAT }}
+
+  build-body:
+    needs: preview-semantic-release
+    runs-on: ubuntu-latest
+    outputs:
+      comment_body: ${{ steps.build.outputs.body }}
+    steps:
+      - name: Build comment body
+        id: build
+        run: |
+          marker='<!-- SEMANTIC-RELEASE-PREVIEW -->'
+          {
+            echo "$marker"
+            if [ "${{ needs.preview-semantic-release.outputs.release_published }}" = "true" ]; then
+              echo "## 🚀 Release Preview"
+              echo ""
+              echo "**Next version:** \`${{ needs.preview-semantic-release.outputs.new_version }}\`"
+              echo ""
+              echo "<details><summary>📝 Release notes</summary>"
+              echo ""
+              echo "${{ needs.preview-semantic-release.outputs.release_notes }}"
+              echo ""
+              echo "</details>"
+            else
+              echo "## ⏭️ No release"
+              echo ""
+              echo "No version bump would be triggered."
+            fi
+          } > comment-body.md
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          cat comment-body.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  comment:
+    needs: build-body
+    if: always()
+    uses: ./.github/workflows/reusable-comment-on-pr.yaml
+    with:
+      body: ${{ needs.build-body.outputs.comment_body }}
+      pr_number: ${{ github.event.pull_request.number }}
+      marker: '<!-- SEMANTIC-RELEASE-PREVIEW -->'
+    secrets:
+      gh_token: ${{ secrets.GITHUB_TOKEN }}

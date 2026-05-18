@@ -1,0 +1,68 @@
+name: Add PR Comment
+
+on:
+  workflow_call:
+    inputs:
+      body:
+        required: true
+        type: string
+        description: 'Markdown body of the comment'
+      pr_number:
+        required: true
+        type: number
+        description: 'Pull request number'
+      marker:
+        required: true
+        type: string
+        description: 'Unique HTML comment that identifies the bot message (for example, <!-- BOT-COMMENT -->)'
+    secrets:
+      gh_token:
+        required: true
+
+jobs:
+  comment-on-pr:
+    runs-on: ubuntu-latest
+    env:
+      COMMENT_BODY: ${{ inputs.body }}          
+      PR_NUMBER: ${{ inputs.pr_number }}
+      MARKER: ${{ inputs.marker }}
+    steps:
+      - name: Find, update, or create the comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.gh_token }}
+          script: |
+            const body   = process.env.COMMENT_BODY;
+            const prNum  = Number(process.env.PR_NUMBER);
+            const marker = process.env.MARKER;
+
+            // Ensure the body contains the marker (prepend if missing)
+            const finalBody = body.includes(marker) ? body : `${marker}\n${body}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNum,
+            });
+
+            const botComment = comments.find(
+              c => c.user.type === 'Bot' && c.body.includes(marker)
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: finalBody,
+              });
+              core.info(`Updated existing comment #${botComment.id}`);
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNum,
+                body: finalBody,
+              });
+              core.info('Created new comment');
+            }

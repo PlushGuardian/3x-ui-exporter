@@ -1,3 +1,20 @@
+### ⚠ BREAKING CHANGE
+
+* make config values structured by component (#7)
+
+### ↻ Refactoring
+
+* make config values structured by component (#7) ([7e119e5](https://github.com/PlushGuardian/3x-ui-exporter/commit/7e119e5cee366121689e674bf4698967c74d0794))  
+  * add `threexui.` and `x-ui-exporter.` prefixes in `.yaml` config
+  * add `threexui-` prefix to flags related to 3X-UI
+  * add full ENV support* move metrics fetch to api client class (#6) ([c84c664](https://github.com/PlushGuardian/3x-ui-exporter/commit/c84c664bc324bf00ea7f58762c4546f699536478))  
+
+### ⇉ CI
+
+* fix docker build by specifying Dockerfile location (#5) ([5fe83d1](https://github.com/PlushGuardian/3x-ui-exporter/commit/5fe83d1fb7fba64d1169c89be57342d6d7705806))  
+* remove header from release notes ([5bac6f5](https://github.com/PlushGuardian/3x-ui-exporter/commit/5bac6f5dbba2170e637049d7587d7369687ab46a))  
+* **semantic-release:** add breaking change support ([ddf2ba3](https://github.com/PlushGuardian/3x-ui-exporter/commit/ddf2ba3c6be721329902f257f2a55b07aa03cdeb))
+
 # [1.5.0](https://github.com/PlushGuardian/3x-ui-exporter/compare/v1.4.1...v1.5.0) (2026-05-18)
 
 

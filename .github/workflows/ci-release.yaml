@@ -37,13 +37,14 @@ jobs:
     with:
       version: ${{ needs.semantic.outputs.new_version }}
       commit_sha: ${{ github.sha }}
-      binary_name: "obfs-exporter"
+      binary_name: "x-ui-exporter"
       architectures: |
         [
           {"os":"linux","arch":"amd64"},
           {"os":"linux","arch":"arm64"},
           {"os":"linux","arch":"arm","goarm":"7"}
         ]
+      main_package_path: "./cmd/x-ui-exporter"
 
   attach-binaries-to-release:
     if: needs.semantic.outputs.release_published == 'true'
@@ -56,7 +57,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: obfs-exporter-*
+          pattern: x-ui-exporter-*
           merge-multiple: true
 
       - name: Upload to GitHub Release

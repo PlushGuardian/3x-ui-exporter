@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 	"time"
-	"x-ui-exporter/api"
-	"x-ui-exporter/config"
-	"x-ui-exporter/metrics"
+	"x-ui-exporter/internal/api"
+	"x-ui-exporter/internal/config"
+	"x-ui-exporter/internal/metrics"
 
 	"github.com/go-co-op/gocron"
 	"github.com/prometheus/client_golang/prometheus"
@@ -58,7 +58,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("3X-UI Exporter (https://github.com/hteppl/3x-ui-exporter/)", version)
+	fmt.Println("3X-UI Exporter (https://github.com/PlushGuardian/3x-ui-exporter/)", version)
 
 	s := gocron.NewScheduler(time.Local)
 	defer s.Stop()

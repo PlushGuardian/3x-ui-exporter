@@ -2,11 +2,9 @@
 .idea
 
 # Build output
-dist/
-
-# Local exporter files
-marzban-exporter
-x-ui-exporter
+build/
 
 # Local config
 config.yaml
+
+go.sum

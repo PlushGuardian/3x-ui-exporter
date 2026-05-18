@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -80,7 +81,30 @@ var (
 	}
 )
 
-func (a *APIClient) GetAuthToken() (*http.Cookie, error) {
+func (a *APIClient) FetchMetrics() error {
+	token, err := a.getAuthToken()
+	if err != nil {
+		return fmt.Errorf("get auth token: %w", err)
+	}
+
+	var errs []error
+
+	if err := a.fetchOnlineUsersCount(token); err != nil {
+		errs = append(errs, fmt.Errorf("error while fetching online user count: %w", err))
+	}
+
+	if err := a.fetchServerStatus(token); err != nil {
+		errs = append(errs, fmt.Errorf("error while fetching server status: %w", err))
+	}
+
+	if err := a.fetchInboundsList(token); err != nil {
+		errs = append(errs, fmt.Errorf("error while fetching inbounds list: %w", err))
+	}
+
+	return errors.Join(errs...)
+}
+
+func (a *APIClient) getAuthToken() (*http.Cookie, error) {
 	cookieCache.Lock()
 	defer cookieCache.Unlock()
 
@@ -149,7 +173,7 @@ func (a *APIClient) GetAuthToken() (*http.Cookie, error) {
 	return &cookieCache.Cookie, nil
 }
 
-func (a *APIClient) FetchOnlineUsersCount(cookie *http.Cookie) error {
+func (a *APIClient) fetchOnlineUsersCount(cookie *http.Cookie) error {
 	// Try the new path first for 3X-UI v2.7.0+
 	body, err := a.sendRequest("/panel/api/inbounds/onlines", http.MethodPost, cookie)
 	if err != nil || len(body) == 0 {
@@ -176,7 +200,7 @@ func (a *APIClient) FetchOnlineUsersCount(cookie *http.Cookie) error {
 	return nil
 }
 
-func (a *APIClient) FetchServerStatus(cookie *http.Cookie) error {
+func (a *APIClient) fetchServerStatus(cookie *http.Cookie) error {
 	// Clear old version metric to avoid accumulating obsolete label values
 	metrics.XrayVersion.Reset()
 
@@ -209,7 +233,7 @@ func (a *APIClient) FetchServerStatus(cookie *http.Cookie) error {
 	return nil
 }
 
-func (a *APIClient) FetchInboundsList(cookie *http.Cookie) error {
+func (a *APIClient) fetchInboundsList(cookie *http.Cookie) error {
 	// Clear old metric values to avoid exposing stale data from previous
 	// updates. Resetting ensures obsolete label combinations are removed
 	// before setting new values.

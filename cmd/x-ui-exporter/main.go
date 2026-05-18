@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -57,19 +56,7 @@ func BasicAuthMiddleware(username, password string, protectedMetrics bool) func(
 func main() {
 	logFile := "/var/log/x-ui-exporter.log"
 
-	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "WARNING: cannot open log file %q: %v. Logging to stderr instead.\n", logFile, err)
-		file = os.Stderr
-	}
-	if file != nil {
-		defer func() { _ = file.Close() }()
-	}
-
-	handler := slog.NewTextHandler(file, &slog.HandlerOptions{
-		Level:     slog.LevelInfo,
-		AddSource: true,
-	})
+	handler := getLogHandler(logFile)
 
 	exporterLogger := slog.New(handler).With("component", "exporter")
 	threeXUILogger := slog.New(handler).With("component", "3x-ui")
@@ -80,7 +67,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("3X-UI Exporter (https://github.com/PlushGuardian/3x-ui-exporter/)", version)
+	exporterLogger.Info("3X-UI Exporter (https://github.com/PlushGuardian/3x-ui-exporter/)", "version", version)
 
 	s := gocron.NewScheduler(time.Local)
 	defer s.Stop()
@@ -94,25 +81,12 @@ func main() {
 	})
 
 	_, err = s.Every(cliConfig.UpdateInterval).Seconds().Do(func() {
-		token, err := client.GetAuthToken()
-		if err != nil {
-			threeXUILogger.Error("get auth token failed", "error", err)
-			return
-		}
-		if err := client.FetchOnlineUsersCount(token); err != nil {
-			threeXUILogger.Error("Error FetchOnlineUsersCount", "error", err)
-		}
-
-		if err := client.FetchServerStatus(token); err != nil {
-			threeXUILogger.Error("Error FetchServerStatus", "error", err)
-		}
-
-		if err := client.FetchInboundsList(token); err != nil {
-			threeXUILogger.Error("Error FetchInboundsList", "error", err)
+		if err := client.FetchMetrics(); err != nil {
+			threeXUILogger.Error("Could not fetch metrics", "error", err)
 		}
 	})
 	if err != nil {
-		threeXUILogger.Error("Schedule job", "error", err)
+		threeXUILogger.Error("Error while scheduling job", "error", err)
 		os.Exit(1)
 	}
 

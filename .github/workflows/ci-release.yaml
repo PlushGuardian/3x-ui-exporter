@@ -19,7 +19,7 @@ jobs:
     with:
       version: ${{ needs.semantic.outputs.new_version }}
       commit_sha: ${{ github.sha }}
-      dockerhub_repository: "3x-ui-exporter"
+      dockerhub_repository: "x-ui-exporter"
       architectures: |
         [
           {"os":"linux","arch":"amd64"},

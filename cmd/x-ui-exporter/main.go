@@ -1,9 +1,13 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"x-ui-exporter/internal/api"
@@ -13,6 +17,8 @@ import (
 	"github.com/go-co-op/gocron"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -55,50 +61,80 @@ func BasicAuthMiddleware(username, password string, protectedMetrics bool) func(
 
 func main() {
 	logFile := "/var/log/x-ui-exporter.log"
+	cfgFile := "/etc/x-ui-exporter/config.yaml"
 
+	// =====| Create loggers |===================================================
 	handler := getLogHandler(logFile)
-
 	exporterLogger := slog.New(handler).With("component", "exporter")
 	threeXUILogger := slog.New(handler).With("component", "3x-ui")
 
-	cliConfig, err := config.Parse(version, commit)
+	// =====| Create flags |=====================================================
+	v := viper.New()
+	fs := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
+	fs.SortFlags = false
+
+	err := config.InitializeFlags(v, fs)
+	if errors.Is(err, config.ErrVersionRequested) {
+		fmt.Printf("x-ui-exporter version %s (commit %s)\n", version, commit)
+		os.Exit(0)
+	}
 	if err != nil {
-		exporterLogger.Error(err.Error())
+		exporterLogger.Error("could not initialize viper flags", "error", err)
 		os.Exit(1)
 	}
 
-	exporterLogger.Info("3X-UI Exporter (https://github.com/PlushGuardian/3x-ui-exporter/)", "version", version)
+	// =====| Read config file |=================================================
+	if val := v.GetString("config-file"); val != "" {
+		cfgFile = val
+	}
+	v.SetConfigFile(cfgFile)
+	if err = v.ReadInConfig(); err != nil {
+		exporterLogger.Error("failed to read config file, using default configuration.", "config file", cfgFile, "error", err)
+	}
 
+	// =====| Set environmental variables |======================================
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
+	v.AutomaticEnv()
+
+	// =====| Unmarshal into config |============================================
+	var cfg config.Config
+	if err := v.Unmarshal(&cfg); err != nil {
+		exporterLogger.Error("failed to unmarshal config", "config file", cfgFile, "error", err)
+	}
+	config.SetupConfigWatch(v, &cfg, exporterLogger)
+
+	// =====| Build client |=====================================================
+	client := api.NewAPIClient(api.APIConfig{
+		BaseURL:            cfg.ThreeXUI.PanelURL(),
+		ApiUsername:        cfg.ThreeXUI.Username,
+		ApiPassword:        cfg.ThreeXUI.Password,
+		InsecureSkipVerify: cfg.ThreeXUI.InsecureSkipVerify,
+		ClientsBytesRows:   cfg.ThreeXUI.ClientsBytesRows,
+	})
+
+	// =====| Schedule scraping |=====================================================
 	s := gocron.NewScheduler(time.Local)
 	defer s.Stop()
 
-	client := api.NewAPIClient(api.APIConfig{
-		BaseURL:            cliConfig.BaseURL,
-		ApiUsername:        cliConfig.ApiUsername,
-		ApiPassword:        cliConfig.ApiPassword,
-		InsecureSkipVerify: cliConfig.InsecureSkipVerify,
-		ClientsBytesRows:   cliConfig.ClientsBytesRows,
-	})
-
-	_, err = s.Every(cliConfig.UpdateInterval).Seconds().Do(func() {
+	_, err = s.Every(cfg.Exporter.UpdateInterval).Seconds().Do(func() {
 		if err := client.FetchMetrics(); err != nil {
-			threeXUILogger.Error("Could not fetch metrics", "error", err)
+			threeXUILogger.Error("could not fetch metrics", "error", err)
 		}
 	})
 	if err != nil {
-		threeXUILogger.Error("Error while scheduling job", "error", err)
+		threeXUILogger.Error("error while scheduling job", "error", err)
 		os.Exit(1)
 	}
-
 	s.StartAsync()
 
+	// =====| Add metrics handle |====================================================
 	http.Handle("/metrics", BasicAuthMiddleware(
-		cliConfig.MetricsUsername,
-		cliConfig.MetricsPassword,
-		cliConfig.ProtectedMetrics,
+		cfg.Exporter.MetricsUsername,
+		cfg.Exporter.MetricsPassword,
+		cfg.Exporter.ProtectedMetrics,
 	)(promhttp.Handler()))
 
-	exporterLogger.Info("Listening %s:%s", cliConfig.Ip, cliConfig.Port)
-	exporterLogger.Error(http.ListenAndServe(cliConfig.Ip+":"+cliConfig.Port, nil).Error())
+	exporterLogger.Info("Listening %s:%s", cfg.Exporter.ListenIP, cfg.Exporter.MetricsPort)
+	exporterLogger.Error(http.ListenAndServe(cfg.Exporter.ListenIP+":"+strconv.Itoa(cfg.Exporter.MetricsPort), nil).Error())
 	os.Exit(1)
 }

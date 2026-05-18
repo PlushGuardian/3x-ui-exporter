@@ -90,15 +90,15 @@ func (a *APIClient) FetchMetrics() error {
 	var errs []error
 
 	if err := a.fetchOnlineUsersCount(token); err != nil {
-		errs = append(errs, fmt.Errorf("Error while fetching online user count: %w", err))
+		errs = append(errs, fmt.Errorf("error while fetching online user count: %w", err))
 	}
 
 	if err := a.fetchServerStatus(token); err != nil {
-		errs = append(errs, fmt.Errorf("Error while fetching server status: %w", err))
+		errs = append(errs, fmt.Errorf("error while fetching server status: %w", err))
 	}
 
 	if err := a.fetchInboundsList(token); err != nil {
-		errs = append(errs, fmt.Errorf("Error while fetching inbounds list: %w", err))
+		errs = append(errs, fmt.Errorf("error while fetching inbounds list: %w", err))
 	}
 
 	return errors.Join(errs...)

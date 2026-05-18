@@ -1,3 +1,27 @@
+# [1.5.0](https://github.com/PlushGuardian/3x-ui-exporter/compare/v1.4.1...v1.5.0) (2026-05-18)
+
+
+### ◈ Features
+
+* improve logging (#4) ([0c7aa36](https://github.com/PlushGuardian/3x-ui-exporter/commit/0c7aa3614ad65edc3d9180d0f5cd6c5dfaf9e242))  
+  * split logs by log levels Debug, Info, Warn, Error
+  * separate logging for 3X-UI APi and exporter itself
+
+### ↻ Refactoring
+
+* change repo structure according to best practices (#1) ([72c1199](https://github.com/PlushGuardian/3x-ui-exporter/commit/72c119975d0f3f77454e5bdd9b193f11265fc611))  
+
+
+### ⚙ Build
+
+* add docker build and push (#3) ([1bf70b7](https://github.com/PlushGuardian/3x-ui-exporter/commit/1bf70b7a4b6082b4f2a07ec6b2074bd21f53d520))  
+
+
+### ⇉ CI
+
+* add lint (#2) ([c05fb64](https://github.com/PlushGuardian/3x-ui-exporter/commit/c05fb64e17649fd565abd307e76ba8e8f461f1c6))  
+* remove release version from release notes message ([138807f](https://github.com/PlushGuardian/3x-ui-exporter/commit/138807facf81741115592909bea2fa837e206066))
+
 ## [1.4.1](https://github.com/PlushGuardian/3x-ui-exporter/compare/v1.4.0...v1.4.1) (2026-05-17)
 
 

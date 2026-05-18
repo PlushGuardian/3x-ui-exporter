@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"x-ui-exporter/metrics"
+	"x-ui-exporter/internal/metrics"
 
 	"github.com/digilolnet/client3xui"
 )

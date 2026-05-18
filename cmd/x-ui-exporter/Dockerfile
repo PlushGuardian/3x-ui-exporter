@@ -28,7 +28,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 FROM gcr.io/distroless/static-debian12:nonroot
 
-LABEL org.opencontainers.image.source=https://github.com/hteppl/x-ui-exporter
+LABEL org.opencontainers.image.source=https://github.com/PlusGuardian/3x-ui-exporter
 
 USER nonroot:nonroot
 

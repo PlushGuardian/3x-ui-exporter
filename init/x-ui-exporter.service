@@ -1,6 +1,6 @@
 [Unit]
 Description=3X-UI Metrics Exporter for Prometheus
-Documentation=https://github.com/hteppl/3x-ui-exporter
+Documentation=https://github.com/PlushGuardian/3x-ui-exporter
 After=network.target
 
 [Service]

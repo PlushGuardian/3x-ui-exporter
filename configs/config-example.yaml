@@ -1,45 +1,40 @@
-# 3X-UI Exporter Configuration Example
-# This file contains all the configuration options available for the 3X-UI Exporter
-# Command-line flags will override these settings if provided
+# ── 3X-UI Exporter Configuration ──────────────────────
+# This file uses the same structure as the application's
+# internal config. Command-line flags override these values.
 
-# 3X-UI panel connection details
-# Base URL of the 3X-UI panel (required)
-panel-base-url: "https://your-panel-url"
+x-ui-exporter:
+  # Bind address for the metrics HTTP server
+  metrics-listen-ip: "0.0.0.0"
+  # Port for the metrics HTTP server
+  metrics-port: 9090
+  # Path where metrics are exposed
+  metrics-path: "/metrics"
+  # Enable basic authentication on the metrics endpoint
+  metrics-protected: false
+  # Username for metrics authentication (required if metrics-protected is true)
+  metrics-username: "metricsUser"
+  # Password for metrics authentication (required if metrics-protected is true)
+  metrics-password: "MetricsVeryHardPassword"
+  # How often (in seconds) to poll the 3X-UI panel
+  update-interval: 30
+  # Timeout for scraping metrics from external sources
+  scrape-timeout: 10s
+  # Timezone for time‑based operations (log timestamps etc.)
+  timezone: "UTC"
 
-# Username for 3X-UI API authentication (required)
-panel-username: "your-username"
-
-# Password for 3X-UI API authentication (required)
-panel-password: "your-password"
-
-# Skip SSL certificate verification (NOT recommended for production)
-# Use this only if your panel uses self-signed certificates
-# or when using a private trusted network
-insecure-skip-verify: false
-
-# General settings
-# Interval in seconds between updates from the panel (default: 30)
-update-interval: 30
-
-# Timezone for time-based operations (default: UTC)
-timezone: "UTC"
-
-# Metrics server configuration
-# Bind address for the metrics server (default: 0.0.0.0)
-metrics-ip: "0.0.0.0"
-
-# Port for the metrics server (default: 9090)
-metrics-port: "9090"
-
-# Clients metrics bytes (0 = all data, else top N rows)
-# Limit rows for clients up/down bytes
-clients-bytes-rows: 0
-
-# Enable authentication for metrics endpoint
-metrics-protected: false
-
-# Username for metrics authentication (required if metrics-protected is true)
-metrics-username: "metricsUser"
-
-# Password for metrics authentication (required if metrics-protected is true)
-metrics-password: "MetricsVeryHardPassword"
+threexui:
+  # Port of the 3X-UI panel (combined with localhost)
+  panel-port: 12345
+  # Base path of the panel API
+  panel-path: "/"
+  # Panel login username
+  username: "your-username"
+  # Panel login password
+  password: "your-password"
+  # Skip SSL verification (dangerous in production)
+  insecure-skip-verify: false
+  # Clients metrics bytes (0 = all data, else top N rows)
+  # Limit rows for clients up/down bytes
+  clients-bytes-rows: 0
+  # Timeout for requests to the panel API
+  timeout: 10s

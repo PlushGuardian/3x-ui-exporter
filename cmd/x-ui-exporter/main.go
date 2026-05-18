@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
+
 	"x-ui-exporter/internal/api"
 	"x-ui-exporter/internal/config"
 	"x-ui-exporter/internal/metrics"
@@ -53,9 +55,29 @@ func BasicAuthMiddleware(username, password string, protectedMetrics bool) func(
 }
 
 func main() {
+	logFile := "/var/log/x-ui-exporter.log"
+
+	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: cannot open log file %q: %v. Logging to stderr instead.\n", logFile, err)
+		file = os.Stderr
+	}
+	if file != nil {
+		defer func() { _ = file.Close() }()
+	}
+
+	handler := slog.NewTextHandler(file, &slog.HandlerOptions{
+		Level:     slog.LevelInfo,
+		AddSource: true,
+	})
+
+	exporterLogger := slog.New(handler).With("component", "exporter")
+	threeXUILogger := slog.New(handler).With("component", "3x-ui")
+
 	cliConfig, err := config.Parse(version, commit)
 	if err != nil {
-		log.Fatal(err)
+		exporterLogger.Error(err.Error())
+		os.Exit(1)
 	}
 
 	fmt.Println("3X-UI Exporter (https://github.com/PlushGuardian/3x-ui-exporter/)", version)
@@ -74,25 +96,24 @@ func main() {
 	_, err = s.Every(cliConfig.UpdateInterval).Seconds().Do(func() {
 		token, err := client.GetAuthToken()
 		if err != nil {
-			log.Printf("get auth token: %v", err)
+			threeXUILogger.Error("get auth token failed", "error", err)
 			return
 		}
-
-		// non-blocking errors
 		if err := client.FetchOnlineUsersCount(token); err != nil {
-			log.Printf("Error FetchOnlineUsersCount: %v", err)
+			threeXUILogger.Error("Error FetchOnlineUsersCount", "error", err)
 		}
 
 		if err := client.FetchServerStatus(token); err != nil {
-			log.Printf("Error FetchServerStatus: %v", err)
+			threeXUILogger.Error("Error FetchServerStatus", "error", err)
 		}
 
 		if err := client.FetchInboundsList(token); err != nil {
-			log.Printf("Error FetchInboundsList: %v", err)
+			threeXUILogger.Error("Error FetchInboundsList", "error", err)
 		}
 	})
 	if err != nil {
-		log.Fatalf("Schedule job: %v", err)
+		threeXUILogger.Error("Schedule job", "error", err)
+		os.Exit(1)
 	}
 
 	s.StartAsync()
@@ -103,6 +124,7 @@ func main() {
 		cliConfig.ProtectedMetrics,
 	)(promhttp.Handler()))
 
-	log.Printf("Listening %s:%s", cliConfig.Ip, cliConfig.Port)
-	log.Fatal(http.ListenAndServe(cliConfig.Ip+":"+cliConfig.Port, nil))
+	exporterLogger.Info("Listening %s:%s", cliConfig.Ip, cliConfig.Port)
+	exporterLogger.Error(http.ListenAndServe(cliConfig.Ip+":"+cliConfig.Port, nil).Error())
+	os.Exit(1)
 }

@@ -57,7 +57,7 @@ jobs:
           go build \
             -ldflags="-w -s -X main.version=${{ inputs.version }} -X main.commit=${{ inputs.commit_sha }}" \
             -trimpath \
-            -o ${{ inputs.binary_name }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }}\
+            -o ${{ inputs.binary_name }}-${{ inputs.version }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }}\
             ${{ inputs.main_package_path }}
 
       - name: Archive binary

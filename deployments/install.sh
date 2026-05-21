@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# --- Global settings -----------------------
+GITHUB_REPO="PlushGuardian/3x-ui-exporter"
+SOURCE_BRANCH="install"
+
+# -------------------------------------------
+
 GREEN='\033[1;32m'
 PURPLE='\033[1;35m'
 NC='\033[0m'
@@ -8,278 +14,337 @@ step() {
   echo -e "\n${GREEN}[$1/8] $2${NC}"
 }
 
-echo "Unfortunately, installation via a script is not implemented yet"
-exit 1
 
-# # Check if script is run as root
-# if [ "$(id -u)" -ne 0 ]; then
-#     echo "Error: This script must be run as root (sudo)."
-#     exit 1
-# fi
+# ------------------------------------------------------------
+# abort_on_error <error_message> [folder_to_remove]
+#
+# Must be called immediately after the command you want to guard.
+# Arguments:
+#   $1 (optional) – Error message to print on failure.
+#   $2 (optional) – Directory to remove (with `rm -rf`) on failure.
+#
+# If the previous command failed (exit ≠ 0), the function:
+#   1. Prints the provided error message to stderr, or a default one, if none was provided.
+#   2. If $2 is given and not empty, deletes that directory.
+#   3. Exits the script with the same non‑zero exit code.
+# ------------------------------------------------------------
+abort_on_error() {
+    local last_exit=$?
+    if [[ $last_exit -ne 0 ]]; then
+        local error_message="${1:-}"
+        if [[ -z $error_message ]]; then
+            error_message="Something went wrong during installation, exiting."
+        fi
+        echo "$error_message" >&2
+        if [[ -n "${2:-}" ]]; then
+            echo "Cleaning up directory: $2" >&2
+            rm -rf "$2"
+        fi
+        exit "$last_exit"
+    fi
+}
 
-# # Determine system architecture
-# ARCH=$(uname -m)
-# case ${ARCH} in
-#     x86_64)
-#         ARCH="amd64"
-#         ;;
-#     aarch64)
-#         ARCH="arm64"
-#         ;;
-#     *)
-#         echo "Unsupported architecture: ${ARCH}"
-#         exit 1
-#         ;;
-# esac
+# ------------------------------------------------------------------
+# prompt_input <var_name> <prompt_text> <default_val> [validation] [--secret]
+#
+# Prompts the user repeatedly until a valid answer is given.
+#   validation  – optional: "number", "nonempty", "port", "bool", … or a custom function name.
+#   --secret    – optional: hides typed characters (useful for passwords).
+#
+# When --secret is used, the prompt shows "[hidden]" instead of the default.
+# Pressing Enter still accepts the default value (even if hidden).
+# ------------------------------------------------------------------
+prompt_input() {
+    local var_name="$1"
+    local prompt_text="$2"
+    local default_val="$3"
 
-# # Get latest release tag
-# echo "Fetching latest release information..."
-# LATEST_RELEASE=$(curl -s https://api.github.com/repos/hteppl/3x-ui-exporter/releases/latest)
-# if [ $? -ne 0 ] || [ -z "$LATEST_RELEASE" ]; then
-#     echo "Failed to fetch release information. Installation aborted."
-#     exit 1
-# fi
+    local validation=""
+    local secret=0
 
-# VERSION=$(echo "${LATEST_RELEASE}" | grep -Po '"tag_name": "\K.*?(?=")')
-# echo -e "\n${PURPLE}✨ Starting 3X-UI Exporter $VERSION automated install wizard...\033[0m"
+    shift 3
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --secret|--password)
+                secret=1
+                shift
+                ;;
+            *)
+                if [[ -z "$validation" ]]; then
+                    validation="$1"
+                else
+                    echo "prompt_input: unexpected argument '$1'" >&2
+                    return 1
+                fi
+                shift
+                ;;
+        esac
+    done
 
-# # Create dedicated system user for running the service
-# step 1 "Creating x-ui-exporter user"
-# if ! id -u x-ui-exporter > /dev/null 2>&1; then
-#     useradd -r -s /bin/false x-ui-exporter
-#     if [ $? -ne 0 ]; then
-#         echo "Failed to create user. Installation aborted."
-#         exit 1
-#     fi
-# fi
+    local input_val
+    while true; do
+        if [[ -z "$default_val" ]]; then
+            read -p "${prompt_text} (required): " input_val
+        else
+            read -p "${prompt_text} [${default_val}]: " input_val
+        fi
 
-# # Download the appropriate archive
-# TEMP_DIR=$(mktemp -d)
-# ARCHIVE_NAME="3x-ui-exporter-${VERSION}-linux-${ARCH}.tar.gz"
-# DOWNLOAD_URL="https://github.com/hteppl/3x-ui-exporter/releases/download/${VERSION}/${ARCHIVE_NAME}"
+        if [[ -z "$default_val" && -z "$input_val" ]]; then
+            echo "  This value is required." >&2
+            continue
+        fi
+        input_val="${input_val:-$default_val}"
 
-# step 2 "Downloading binary from: ${DOWNLOAD_URL}"
-# curl -L -o "${TEMP_DIR}/${ARCHIVE_NAME}" "${DOWNLOAD_URL}"
-# if [ $? -ne 0 ]; then
-#     echo "Failed to download binary. Installation aborted."
-#     rm -rf "${TEMP_DIR}"
-#     exit 1
-# fi
+        # Validation logic
+        case "$validation" in
+            number)
+                if [[ "$input_val" =~ ^[0-9]+$ ]]; then break
+                else echo "  Please enter a positive integer." >&2; fi
+                ;;
+            nonempty)
+                if [[ -n "$input_val" ]]; then break
+                else echo "  This value cannot be empty." >&2; fi
+                ;;
+            port)
+                if [[ "$input_val" =~ ^[0-9]+$ ]] && (( input_val >= 1 && input_val <= 65535 )); then break
+                else echo "  Please enter a valid port (1-65535)." >&2; fi
+                ;;
+            bool|boolean)
+                case "${input_val,,}" in
+                    true|yes|1)   input_val="true";  break ;;
+                    false|no|0)   input_val="false"; break ;;
+                    *)            echo "  Please answer 'true' or 'false'." >&2 ;;
+                esac
+                ;;
+            "") break ;;   # no validation → accept anything
+            *)
+                # Assume it's a custom function name
+                if declare -F "$validation" &>/dev/null && "$validation" "$input_val"; then
+                    break
+                else
+                    echo "  Invalid input. Please try again." >&2
+                fi
+                ;;
+        esac
+    done
 
-# # Extract binary
-# step 3 "Extracting binary..."
-# tar -xzf "${TEMP_DIR}/${ARCHIVE_NAME}" -C "${TEMP_DIR}"
-# if [ $? -ne 0 ]; then
-#     echo "Failed to extract binary. Installation aborted."
-#     rm -rf "${TEMP_DIR}"
-#     exit 1
-# fi
+    export "$var_name"="$input_val"
+}
 
-# # Force remove old binary if exists
-# if [ -f /usr/local/bin/x-ui-exporter ]; then
-#     rm -f /usr/local/bin/x-ui-exporter
-#     if [ $? -ne 0 ]; then
-#         echo "Failed to remove old binary. Installation aborted."
-#         rm -rf "${TEMP_DIR}"
-#         exit 1
-#     fi
-# fi
 
-# # Install binary to /usr/local/bin
-# step 4 "Installing binary to /usr/local/bin..."
-# cp "${TEMP_DIR}/x-ui-exporter" /usr/local/bin/
-# if [ $? -ne 0 ]; then
-#     echo "Failed to install binary. Installation aborted."
-#     rm -rf "${TEMP_DIR}"
-#     exit 1
-# fi
+# ------------------------------------------------------------------
+# ask_continue [question] [yes_msg] [no_msg]
+# Returns 0 (true) on yes, 1 (false) on no.
+# Prints the corresponding message if provided.
+# ------------------------------------------------------------------
+ask_continue() {
+    local question="${1:-Do you want to continue?}"
+    local yes_msg="${2:-}"   # message on yes (optional)
+    local no_msg="${3:-}"    # message on no  (optional)
+    local ans
+    while true; do
+        read -p "${question} (y/n): " ans
+        case "${ans,,}" in
+            y|yes)
+                [[ -n "$yes_msg" ]] && echo "$yes_msg"
+                return 0 ;;
+            n|no)
+                [[ -n "$no_msg"  ]] && echo "$no_msg"
+                return 1 ;;
+            *)
+                echo "Please answer yes or no." ;;
+        esac
+    done
+}
 
-# # Clean up and set permissions
-# rm -rf "${TEMP_DIR}"
-# chmod 755 /usr/local/bin/x-ui-exporter
+# Check if script is run as root
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Error: This script must be run as root (sudo)."
+    exit 1
+fi
 
-# # Create config directory
-# step 5 "Creating configuration directory..."
-# mkdir -p /etc/x-ui-exporter/
-# if [ $? -ne 0 ]; then
-#     echo "Failed to create config directory. Installation aborted."
-#     exit 1
-# fi
+# Determine system architecture
+ARCH=$(uname -m)
+case ${ARCH} in
+    x86_64)
+        ARCH="amd64"
+        ;;
+    aarch64)
+        ARCH="arm64"
+        ;;
+    *)
+        echo "Unsupported architecture: ${ARCH}"
+        exit 1
+        ;;
+esac
 
-# # Check if config file already exists
-# CONFIG_FILE="/etc/x-ui-exporter/config.yaml"
-# SKIP_CONFIG_SETUP=0
-# if [ -f "$CONFIG_FILE" ]; then
-#     echo "Configuration file already exists at $CONFIG_FILE"
-#     while true; do
-#         read -p "Do you want to overwrite the existing config? (y/N): " yn
-#         case $yn in
-#             [Yy]* )
-#                 echo "Overwriting existing configuration..."
-#                 break
-#                 ;;
-#             * )
-#                 echo "Skipping config setup."
-#                 SKIP_CONFIG_SETUP=1
-#                 ;;
-#         esac
-#         [ $SKIP_CONFIG_SETUP -eq 1 ] && break
-#     done
-# fi
+# Get latest release tag
+echo "Fetching latest release information..."
+LATEST_RELEASE=$(curl -s https://api.github.com/repos/${GITHUB_REPO}/releases/latest)
+abort_on_error "Failed to fetch release information. Installation aborted."
 
-# if [ $SKIP_CONFIG_SETUP -eq 0 ]; then
-#     # Download example config file
-#     echo "Downloading example config from GitHub..."
-#     curl -s -o "$CONFIG_FILE" https://raw.githubusercontent.com/hteppl/3x-ui-exporter/main/config-example.yaml
-#     if [ $? -ne 0 ]; then
-#         echo "Failed to download config file. Installation aborted."
-#         exit 1
-#     fi
+VERSION=$(echo "${LATEST_RELEASE}" | grep -Po '"tag_name": "\K.*?(?=")')
+echo -e "\n${PURPLE}✨ Starting 3X-UI Exporter $VERSION automated install wizard...\033[0m"
 
-#     # Interactive configuration
-#     echo "Provide your 3X-UI panel details:"
+# Create dedicated system user for running the service
+step 1 "Creating x-ui-exporter user"
+if ! id -u x-ui-exporter > /dev/null 2>&1; then
+    useradd -r -s /bin/false x-ui-exporter
+    abort_on_error "Failed to create user. Installation aborted."
+fi
 
-#     # Get Panel URL
-#     while true; do
-#         read -p "Enter Panel URL (e.g., http://example.com:54321): " PANEL_URL
-#         # Remove trailing slash if present
-#         PANEL_URL=${PANEL_URL%/}
+# Download the appropriate archive
+TEMP_DIR=$(mktemp -d)
+ARCHIVE_NAME="x-ui-exporter-${VERSION}-linux-${ARCH}.tar.gz"
+DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${ARCHIVE_NAME}"
 
-#         if [ -z "$PANEL_URL" ]; then
-#             echo "Error: Panel URL cannot be empty. Please try again."
-#         elif [[ ! "$PANEL_URL" =~ ^https?:// ]]; then
-#             echo "Error: Panel URL must start with http:// or https://. Please try again."
-#         else
-#             break
-#         fi
-#     done
+step 2 "Downloading binary from: ${DOWNLOAD_URL}"
+curl -L -o "${TEMP_DIR}/${ARCHIVE_NAME}" "${DOWNLOAD_URL}"
+abort_on_error  "Failed to download binary. Installation aborted." "${TEMP_DIR}"
 
-#     # Get credentials
-#     while true; do
-#         read -p "Enter Panel Username: " PANEL_USERNAME
-#         if [ -z "$PANEL_USERNAME" ]; then
-#             echo "Error: Panel Username cannot be empty. Please try again."
-#         else
-#             break
-#         fi
-#     done
+# Extract binary
+step 3 "Extracting binary..."
+tar -xzf "${TEMP_DIR}/${ARCHIVE_NAME}" -C "${TEMP_DIR}"
+abort_on_error "Failed to extract binary. Installation aborted." "${TEMP_DIR}"
 
-#     while true; do
-#         read -s -p "Enter Panel Password: " PANEL_PASSWORD
-#         echo ""
-#         if [ -z "$PANEL_PASSWORD" ]; then
-#             echo "Error: Panel Password cannot be empty. Please try again."
-#         else
-#             break
-#         fi
-#     done
+# Force remove old binary if exists
+if [ -f /usr/local/bin/x-ui-exporter ]; then
+    rm -f /usr/local/bin/x-ui-exporter
+    abort_on_error "Failed to remove old binary. Installation aborted." "${TEMP_DIR}"
+fi
 
-#     # Validate connection to panel
-#     echo "Validating connection to panel..."
-#     TEMP_RESPONSE=$(mktemp)
-#     CURL_EXIT_CODE=0
-#     LOGIN_RESULT=$(curl -s -w "%{http_code}" -o "$TEMP_RESPONSE" -X POST "${PANEL_URL}/login" \
-#         -H "Content-Type: application/json" \
-#         -d "{\"username\":\"${PANEL_USERNAME}\",\"password\":\"${PANEL_PASSWORD}\"}" || { CURL_EXIT_CODE=$?; echo "000"; })
+# Install binary to /usr/local/bin
+step 4 "Installing binary to /usr/local/bin..."
+cp "${TEMP_DIR}/x-ui-exporter" /usr/local/bin/
+abort_on_error "Failed to install binary. Installation aborted." "${TEMP_DIR}"
 
-#     if [ $CURL_EXIT_CODE -ne 0 ]; then
-#         echo "Failed to connect to panel. Network error (curl exit code: $CURL_EXIT_CODE)"
-#         echo "Please check if the panel URL is correct and the server is reachable."
-#         read -p "Continue anyway? (y/n): " CONTINUE
-#         if [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ]; then
-#             rm -f "$TEMP_RESPONSE"
-#             echo "Installation aborted."
-#             exit 1
-#         fi
-#     elif [ "$LOGIN_RESULT" == "200" ] || [ "$LOGIN_RESULT" == "303" ]; then
-#         echo "Successfully connected to panel!"
-#     elif [ "$LOGIN_RESULT" == "401" ] || [ "$LOGIN_RESULT" == "403" ]; then
-#         echo "Authentication failed. Invalid username or password."
-#         read -p "Continue anyway? (y/n): " CONTINUE
-#         if [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ]; then
-#             rm -f "$TEMP_RESPONSE"
-#             echo "Installation aborted."
-#             exit 1
-#         fi
-#     else
-#         echo "Failed to connect to panel. HTTP status: ${LOGIN_RESULT}"
-#         echo "Please verify your panel URL and credentials."
-#         read -p "Continue anyway? (y/n): " CONTINUE
-#         if [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ]; then
-#             rm -f "$TEMP_RESPONSE"
-#             echo "Installation aborted."
-#             exit 1
-#         fi
-#     fi
-#     rm -f "$TEMP_RESPONSE"
+# Clean up and set permissions
+rm -rf "${TEMP_DIR}"
+chmod 755 /usr/local/bin/x-ui-exporter
 
-#     # Update the config file with user input
-#     echo "Updating configuration file with provided details..."
-#     # Escape special characters in variables for sed
-#     PANEL_URL_ESCAPED=$(echo "$PANEL_URL" | sed 's/[\/&]/\\&/g')
-#     PANEL_USERNAME_ESCAPED=$(echo "$PANEL_USERNAME" | sed 's/[\/&]/\\&/g')
-#     PANEL_PASSWORD_ESCAPED=$(echo "$PANEL_PASSWORD" | sed 's/[\/&]/\\&/g')
+# Create config directory
+step 5 "Creating configuration directory..."
+mkdir -p /etc/x-ui-exporter/
+abort_on_error "Failed to create config directory. Installation aborted."
 
-#     sed -i "s|panel-base-url:.*|panel-base-url: \"${PANEL_URL_ESCAPED}\"|" "$CONFIG_FILE"
-#     sed -i "s|panel-username:.*|panel-username: \"${PANEL_USERNAME_ESCAPED}\"|" "$CONFIG_FILE"
-#     sed -i "s|panel-password:.*|panel-password: \"${PANEL_PASSWORD_ESCAPED}\"|" "$CONFIG_FILE"
-# else
-#     echo "Using existing configuration file without changes."
-# fi
+# Check if config file already exists
+CONFIG_FILE="/etc/x-ui-exporter/config.yaml"
+SKIP_CONFIG_SETUP=0
+if [ -f "$CONFIG_FILE" ]; then
+    echo "Configuration file already exists at $CONFIG_FILE"
+    ask_continue "Do you want to overwrite the existing config?" \
+                 "Overwriting existing configuration..." \
+                 "Skipping config setup."
+    SKIP_CONFIG_SETUP=$(( ! $? ))
+fi
 
-# chmod 644 "$CONFIG_FILE"
-# chown -R x-ui-exporter:x-ui-exporter /etc/x-ui-exporter
+if [ $SKIP_CONFIG_SETUP -eq 0 ]; then
+    # Download example config file
+    echo "Downloading config template from GitHub..."
+    curl -s -o "$CONFIG_FILE.tmpl"  https://raw.githubusercontent.com/${GITHUB_REPO}/${SOURCE_BRANCH}/configs/config.yaml.tmpl
+    abort_on_error "Failed to download config file. Installation aborted."
 
-# # Create systemd service file
-# step 6 "Downloading systemd service file from GitHub..."
-# curl -s -o /etc/systemd/system/x-ui-exporter.service https://raw.githubusercontent.com/hteppl/3x-ui-exporter/main/x-ui-exporter.service
+    echo "============================================="
+    echo " 3X-UI Exporter Configuration"
+    echo "============================================="
+    echo
 
-# if [ $? -ne 0 ]; then
-#     echo "Failed to create service file. Installation aborted."
-#     exit 1
-# fi
+    echo "--- Metrics Server ---"
+    prompt_input X_UI_EXPORTER_METRICS_LISTEN_IP   "Metrics listen IP"               "0.0.0.0"  validate_ip
+    prompt_input X_UI_EXPORTER_METRICS_PORT        "Metrics port"                    "9090"     port
+    prompt_input X_UI_EXPORTER_METRICS_PATH        "Metrics path"                    "/metrics" nonempty
+    prompt_input X_UI_EXPORTER_METRICS_PROTECTED   "Enable basic auth? (true/false)" "false"    bool
+    prompt_input X_UI_EXPORTER_METRICS_USERNAME    "Metrics username"                ""         nonempty
+    prompt_input X_UI_EXPORTER_METRICS_PASSWORD    "Metrics password"                ""         nonempty --secret
+    prompt_input X_UI_EXPORTER_UPDATE_INTERVAL     "Polling interval (seconds)"      "30"       number
+    prompt_input X_UI_EXPORTER_SCRAPE_TIMEOUT      "Scrape timeout in seconds"       "10s"      validate_duration
+    prompt_input X_UI_EXPORTER_TIMEZONE            "Timezone"                        "UTC"      nonempty
 
-# sed -i "s|^Description=\(.*\)|Description=\1 ${VERSION}|" /etc/systemd/system/x-ui-exporter.service
-# chmod 644 /etc/systemd/system/x-ui-exporter.service
+    echo
+    echo "--- 3X-UI Panel Connection ---"
+    prompt_input THREEXUI_PANEL_PORT               "Panel port"                   ""             port
+    prompt_input THREEXUI_PANEL_PATH               "Panel base path"              ""             nonempty
+    prompt_input THREEXUI_PANEL_USERNAME           "Panel username"               ""             nonempty
+    prompt_input THREEXUI_PANEL_PASSWORD           "Panel password"               ""             nonempty --secret
+    prompt_input THREEXUI_INSECURE_SKIP_VERIFY     "Skip SSL verification? (true/false)" "false" bool
+    prompt_input THREEXUI_CLIENTS_BYTES_ROWS       "Clients bytes rows (0 = all)" "0"            number
+    prompt_input THREEXUI_PANEL_TIMEOUT            "Request timeout in seconds"   "10s"          validate_duration
 
-# # Reload systemd to recognize the new service
-# step 7 "Reloading systemd daemon..."
-# systemctl daemon-reload
-# if [ $? -ne 0 ]; then
-#     echo "Failed to reload systemd. Installation aborted."
-#     exit 1
-# fi
+    # ── Panel connection validation ────────────────────────────────────────
+    # Build the full login URL (handles custom panel-path cleanly)
+    PANEL_BASE="http://127.0.0.1:${THREEXUI_PANEL_PORT}"
+    # Strip leading slash from panel path to avoid double slashes
+    PANEL_PATH_CLEAN="${THREEXUI_PANEL_PATH#/}"
+    PANEL_URL="${PANEL_BASE}/${PANEL_PATH_CLEAN}login"
+    # In case panel-path is "/" we would have "...//login" → fix it
+    PANEL_URL="${PANEL_URL//\/\/login/\/login}"
 
-# # Enable and start (or restart) the service
-# step 8 "Enabling and starting x-ui-exporter service..."
-# if systemctl is-active --quiet x-ui-exporter.service; then
-#     echo "Service is already running. Restarting..."
-#     systemctl restart x-ui-exporter.service
-#     if [ $? -ne 0 ]; then
-#         echo "Failed to restart service. Installation aborted."
-#         exit 1
-#     fi
-# else
-#     systemctl enable x-ui-exporter.service
-#     if [ $? -ne 0 ]; then
-#         echo "Failed to enable service. Installation aborted."
-#         exit 1
-#     fi
+    echo "Validating connection to panel..."
 
-#     systemctl start x-ui-exporter.service
-#     if [ $? -ne 0 ]; then
-#         echo "Failed to start service. Installation aborted."
-#         exit 1
-#     fi
-# fi
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$PANEL_URL" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"${THREEXUI_PANEL_USERNAME}\",\"password\":\"${THREEXUI_PANEL_PASSWORD}\"}" \
+    ) || { echo "Failed to connect to panel. Network error (curl exit code: $?)."; ask_continue; }
 
-# sudo systemctl status x-ui-exporter --no-pager
+    case "$HTTP_CODE" in
+        200|303)
+            echo "Successfully connected to panel!"
+            ;;
+        401|403)
+            echo "Authentication failed. Invalid username or password."
+            ask_continue || exit 1
+            ;;
+        *)
+            echo "Failed to connect to panel. HTTP status: $HTTP_CODE"
+            echo "Please verify your panel URL and credentials."
+            ask_continue || exit 1
+            ;;
+    esac
 
-# echo -e "\n${PURPLE}✅ 3X-UI Exporter is installed!"
-# echo -e "${GREEN}\nCheck status:      ${NC}sudo systemctl status x-ui-exporter --no-pager"
-# echo -e "${GREEN}Binary path:       ${NC}/usr/local/bin/x-ui-exporter"
-# echo -e "${GREEN}Config path:       ${NC}$CONFIG_FILE"
-# echo ""
-# echo -e "You can view logs with: journalctl -u x-ui-exporter.service"
-# echo -e "Support the project: \033[1;33mhttps://pay.cloudtips.ru/p/67507843${NC}"
-# echo ""
+    # ── Now generate config.yaml from template ─────────────────────────────
+    envsubst < $CONFIG_FILE.tmpl > $CONFIG_FILE
+    echo "✔ Configuration generated and saved to $CONFIG_FILE."
+
+else
+    echo "Using existing configuration file without changes."
+fi
+
+chmod 644 "$CONFIG_FILE"
+chown -R x-ui-exporter:x-ui-exporter /etc/x-ui-exporter
+
+# Create systemd service file
+step 6 "Downloading systemd service file from GitHub..."
+curl -s -o /etc/systemd/system/x-ui-exporter.service https://raw.githubusercontent.com/${GITHUB_REPO}/${SOURCE_BRANCH}/init/x-ui-exporter.service
+abort_on_error "Failed to create service file. Installation aborted."
+
+sed -i "s|^Description=\(.*\)|Description=\1 ${VERSION}|" /etc/systemd/system/x-ui-exporter.service
+chmod 644 /etc/systemd/system/x-ui-exporter.service
+
+# Reload systemd to recognize the new service
+step 7 "Reloading systemd daemon..."
+systemctl daemon-reload
+abort_on_error "Failed to reload systemd. Installation aborted."
+
+# Enable and start (or restart) the service
+step 8 "Enabling and starting x-ui-exporter service..."
+if systemctl is-active --quiet x-ui-exporter.service; then
+    echo "Service is already running. Restarting..."
+    systemctl restart x-ui-exporter.service
+    abort_on_error "Failed to restart service. Installation aborted."
+else
+    systemctl enable x-ui-exporter.service
+    abort_on_error "Failed to enable service. Installation aborted."
+
+    systemctl start x-ui-exporter.service
+    abort_on_error "Failed to start service. Installation aborted."
+fi
+
+sudo systemctl status x-ui-exporter --no-pager
+
+echo -e "\n${PURPLE}✅ 3X-UI Exporter is installed!"
+echo -e "${GREEN}\nCheck status:      ${NC}sudo systemctl status x-ui-exporter --no-pager"
+echo -e "${GREEN}Binary path:       ${NC}/usr/local/bin/x-ui-exporter"
+echo -e "${GREEN}Config path:       ${NC}$CONFIG_FILE"
+echo ""
+echo -e "You can view logs with: journalctl -u x-ui-exporter.service"
+echo ""

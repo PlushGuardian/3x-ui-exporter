@@ -1,0 +1,19 @@
+x-ui-exporter:
+  metrics-listen-ip: "${X_UI_EXPORTER_METRICS_LISTEN_IP}"
+  metrics-port: ${X_UI_EXPORTER_METRICS_PORT}
+  metrics-path: "${X_UI_EXPORTER_METRICS_PATH}"
+  metrics-protected: ${X_UI_EXPORTER_METRICS_PROTECTED}
+  metrics-username: "${X_UI_EXPORTER_METRICS_USERNAME}"
+  metrics-password: "${X_UI_EXPORTER_METRICS_PASSWORD}"
+  update-interval: ${X_UI_EXPORTER_UPDATE_INTERVAL}
+  scrape-timeout: ${X_UI_EXPORTER_SCRAPE_TIMEOUT}
+  timezone: "${X_UI_EXPORTER_TIMEZONE}"
+
+threexui:
+  panel-port: ${THREEXUI_PANEL_PORT}
+  panel-path: "${THREEXUI_PANEL_PATH}"
+  username: "${THREEXUI_PANEL_USERNAME}"
+  password: "${THREEXUI_PANEL_PASSWORD}"
+  insecure-skip-verify: ${THREEXUI_INSECURE_SKIP_VERIFY}
+  clients-bytes-rows: ${THREEXUI_CLIENTS_BYTES_ROWS}
+  timeout: ${THREEXUI_PANEL_TIMEOUT}

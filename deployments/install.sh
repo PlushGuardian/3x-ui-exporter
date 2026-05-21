@@ -131,6 +131,17 @@ prompt_input() {
     export "$var_name"="$input_val"
 }
 
+validate_ip() {
+    local ip="$1"
+    [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || return 1
+    IFS='.' read -r a b c d <<< "$ip"
+    (( a <= 255 && b <= 255 && c <= 255 && d <= 255 ))
+}
+
+validate_duration() {
+    [[ "$1" =~ ^[0-9]+(s|m|h)$ ]]
+}
+
 
 # ------------------------------------------------------------------
 # ask_continue [question] [yes_msg] [no_msg]

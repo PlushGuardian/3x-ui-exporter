@@ -81,12 +81,19 @@ prompt_input() {
         esac
     done
 
-    local input_val
+    local input_valprompt_full
+    if [[ -z "$default_val" ]]; then
+        prompt_full="${prompt_text} (required): "
+    else
+        prompt_full="${prompt_text} [${default_val}]: "
+    fi
+
     while true; do
-        if [[ -z "$default_val" ]]; then
-            read -p "${prompt_text} (required): " input_val
+        if [[ $secret -eq 1 ]]; then
+            read -s -p "$prompt_full" input_val
+            echo
         else
-            read -p "${prompt_text} [${default_val}]: " input_val
+            read -p "$prompt_full" input_val
         fi
 
         if [[ -z "$default_val" && -z "$input_val" ]]; then
@@ -265,8 +272,14 @@ if [ $SKIP_CONFIG_SETUP -eq 0 ]; then
     prompt_input X_UI_EXPORTER_METRICS_PORT        "Metrics port"                    "9090"     port
     prompt_input X_UI_EXPORTER_METRICS_PATH        "Metrics path"                    "/metrics" nonempty
     prompt_input X_UI_EXPORTER_METRICS_PROTECTED   "Enable basic auth? (true/false)" "false"    bool
-    prompt_input X_UI_EXPORTER_METRICS_USERNAME    "Metrics username"                ""         nonempty
-    prompt_input X_UI_EXPORTER_METRICS_PASSWORD    "Metrics password"                ""         nonempty --secret
+
+    if [[ "${X_UI_EXPORTER_METRICS_PROTECTED}" == "true" ]]; then
+        prompt_input X_UI_EXPORTER_METRICS_USERNAME    "Metrics username"                "metricsUser"                nonempty
+        prompt_input X_UI_EXPORTER_METRICS_PASSWORD    "Metrics password"                "MetricsVeryHardPassword"    nonempty --secret
+    else
+        export X_UI_EXPORTER_METRICS_USERNAME=""
+        export X_UI_EXPORTER_METRICS_PASSWORD=""
+    fi
     prompt_input X_UI_EXPORTER_UPDATE_INTERVAL     "Polling interval (seconds)"      "30"       number
     prompt_input X_UI_EXPORTER_SCRAPE_TIMEOUT      "Scrape timeout in seconds"       "10s"      validate_duration
     prompt_input X_UI_EXPORTER_TIMEZONE            "Timezone"                        "UTC"      nonempty
@@ -286,7 +299,7 @@ if [ $SKIP_CONFIG_SETUP -eq 0 ]; then
     PANEL_BASE="http://127.0.0.1:${THREEXUI_PANEL_PORT}"
     # Strip leading slash from panel path to avoid double slashes
     PANEL_PATH_CLEAN="${THREEXUI_PANEL_PATH#/}"
-    PANEL_URL="${PANEL_BASE}/${PANEL_PATH_CLEAN}login"
+    PANEL_URL="${PANEL_BASE}/${PANEL_PATH_CLEAN}/login"
     # In case panel-path is "/" we would have "...//login" → fix it
     PANEL_URL="${PANEL_URL//\/\/login/\/login}"
 

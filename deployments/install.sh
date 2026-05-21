@@ -175,6 +175,27 @@ ask_continue() {
     done
 }
 
+# ------------------------------------------------------------------
+# substitute_template [template_file] [output_file]
+# Replaces ${VARIABLE} placeholders with exported env vars.
+# Works without external tools like envsubst
+# ------------------------------------------------------------------
+substitute_template() {
+    local tmpl="$1"
+    local out="$2"
+    local line var
+
+    while IFS= read -r line; do
+        while [[ "$line" =~ \$\{([_a-zA-Z][_a-zA-Z0-9]*)\} ]]; do
+            var="${BASH_REMATCH[1]}"
+            line="${line//\$\{${var}\}/${!var}}"
+        done
+        printf '%s\n' "$line"
+    done < "$tmpl" > "$out"
+}
+
+
+
 # Check if script is run as root
 if [ "$(id -u)" -ne 0 ]; then
     echo "Error: This script must be run as root (sudo)."
@@ -253,7 +274,7 @@ if [ -f "$CONFIG_FILE" ]; then
     ask_continue "Do you want to overwrite the existing config?" \
                  "Overwriting existing configuration..." \
                  "Skipping config setup."
-    SKIP_CONFIG_SETUP=$(( ! $? ))
+    SKIP_CONFIG_SETUP=$?
 fi
 
 if [ $SKIP_CONFIG_SETUP -eq 0 ]; then
@@ -292,7 +313,7 @@ if [ $SKIP_CONFIG_SETUP -eq 0 ]; then
     prompt_input THREEXUI_PANEL_PASSWORD           "Panel password"               ""             nonempty --secret
     prompt_input THREEXUI_INSECURE_SKIP_VERIFY     "Skip SSL verification? (true/false)" "false" bool
     prompt_input THREEXUI_CLIENTS_BYTES_ROWS       "Clients bytes rows (0 = all)" "0"            number
-    prompt_input THREEXUI_PANEL_TIMEOUT            "Request timeout (seconds)"    "10s"          number
+    prompt_input THREEXUI_PANEL_TIMEOUT            "Request timeout (seconds)"    "10"           number
 
     # ── Panel connection validation ────────────────────────────────────────
     PANEL_BASE="http://127.0.0.1:${THREEXUI_PANEL_PORT}"
@@ -323,7 +344,7 @@ if [ $SKIP_CONFIG_SETUP -eq 0 ]; then
     esac
 
     # ── Now generate config.yaml from template ─────────────────────────────
-    envsubst < $CONFIG_FILE.tmpl > $CONFIG_FILE
+    substitute_template $CONFIG_FILE.tmpl $CONFIG_FILE
     rm -rf $CONFIG_FILE.tmpl
     echo "✔ Configuration generated and saved to $CONFIG_FILE."
 

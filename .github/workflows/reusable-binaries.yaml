@@ -63,9 +63,9 @@ jobs:
       - name: Archive binary
         run: |
           if [ "${{ matrix.os }}" = "windows" ]; then
-            zip ${{ inputs.binary_name }}-${{ inputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.zip ${{ inputs.binary_name }}-${{ matrix.os }}-${{ matrix.arch }}.exe
+            zip ${{ inputs.binary_name }}-${{ inputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.zip ${{ inputs.binary_name }}.exe
           else
-            tar -czf ${{ inputs.binary_name }}-${{ inputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz ${{ inputs.binary_name }}-${{ matrix.os }}-${{ matrix.arch }}
+            tar -czf ${{ inputs.binary_name }}-${{ inputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz ${{ inputs.binary_name }}
           fi
 
       - name: Upload artifact

@@ -281,7 +281,7 @@ if [ $SKIP_CONFIG_SETUP -eq 0 ]; then
         export X_UI_EXPORTER_METRICS_PASSWORD=""
     fi
     prompt_input X_UI_EXPORTER_UPDATE_INTERVAL     "Polling interval (seconds)"      "30"       number
-    prompt_input X_UI_EXPORTER_SCRAPE_TIMEOUT      "Scrape timeout in seconds"       "10s"      validate_duration
+    prompt_input X_UI_EXPORTER_SCRAPE_TIMEOUT      "Scrape timeout (seconds)"        "10"       number
     prompt_input X_UI_EXPORTER_TIMEZONE            "Timezone"                        "UTC"      nonempty
 
     echo
@@ -292,15 +292,12 @@ if [ $SKIP_CONFIG_SETUP -eq 0 ]; then
     prompt_input THREEXUI_PANEL_PASSWORD           "Panel password"               ""             nonempty --secret
     prompt_input THREEXUI_INSECURE_SKIP_VERIFY     "Skip SSL verification? (true/false)" "false" bool
     prompt_input THREEXUI_CLIENTS_BYTES_ROWS       "Clients bytes rows (0 = all)" "0"            number
-    prompt_input THREEXUI_PANEL_TIMEOUT            "Request timeout in seconds"   "10s"          validate_duration
+    prompt_input THREEXUI_PANEL_TIMEOUT            "Request timeout (seconds)"    "10s"          number
 
     # ── Panel connection validation ────────────────────────────────────────
-    # Build the full login URL (handles custom panel-path cleanly)
     PANEL_BASE="http://127.0.0.1:${THREEXUI_PANEL_PORT}"
-    # Strip leading slash from panel path to avoid double slashes
     PANEL_PATH_CLEAN="${THREEXUI_PANEL_PATH#/}"
     PANEL_URL="${PANEL_BASE}/${PANEL_PATH_CLEAN}/login"
-    # In case panel-path is "/" we would have "...//login" → fix it
     PANEL_URL="${PANEL_URL//\/\/login/\/login}"
 
     echo "Validating connection to panel..."

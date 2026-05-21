@@ -274,7 +274,7 @@ if [ -f "$CONFIG_FILE" ]; then
     ask_continue "Do you want to overwrite the existing config?" \
                  "Overwriting existing configuration..." \
                  "Skipping config setup."
-    SKIP_CONFIG_SETUP=$(( ! $? ))
+    SKIP_CONFIG_SETUP=$?
 fi
 
 if [ $SKIP_CONFIG_SETUP -eq 0 ]; then

@@ -1,3 +1,7 @@
+### ⚒ Fixes
+
+* **build,ci:** add version name to archive and remove it from binary (#9) ([2bdf1c3](https://github.com/PlushGuardian/3x-ui-exporter/commit/2bdf1c38f660a15eda64e45a13de14f462efa893))
+
 ### ⚠ BREAKING CHANGE
 
 * make config values structured by component (#7)

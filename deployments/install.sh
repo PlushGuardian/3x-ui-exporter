@@ -344,7 +344,7 @@ if [ $SKIP_CONFIG_SETUP -eq 0 ]; then
     esac
 
     # ── Now generate config.yaml from template ─────────────────────────────
-    envsubst < $CONFIG_FILE.tmpl > $CONFIG_FILE
+    substitute_template $CONFIG_FILE.tmpl $CONFIG_FILE
     rm -rf $CONFIG_FILE.tmpl
     echo "✔ Configuration generated and saved to $CONFIG_FILE."
 

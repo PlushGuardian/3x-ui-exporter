@@ -1,5 +1,9 @@
 ### ⚒ Fixes
 
+* **build:** remove architecture from archiving ([358c5f8](https://github.com/PlushGuardian/3x-ui-exporter/commit/358c5f80a3f9a15484e14ca91c790379b455d491))
+
+### ⚒ Fixes
+
 * **build,ci:** add version name to archive and remove it from binary (#9) ([2bdf1c3](https://github.com/PlushGuardian/3x-ui-exporter/commit/2bdf1c38f660a15eda64e45a13de14f462efa893))
 
 ### ⚠ BREAKING CHANGE

@@ -324,13 +324,14 @@ if [ $SKIP_CONFIG_SETUP -eq 0 ]; then
 
     # ── Now generate config.yaml from template ─────────────────────────────
     envsubst < $CONFIG_FILE.tmpl > $CONFIG_FILE
+    rm -rf $CONFIG_FILE.tmpl
     echo "✔ Configuration generated and saved to $CONFIG_FILE."
 
 else
     echo "Using existing configuration file without changes."
 fi
 
-chmod 644 "$CONFIG_FILE"
+chmod 600 "$CONFIG_FILE"
 chown -R x-ui-exporter:x-ui-exporter /etc/x-ui-exporter
 
 # Create systemd service file

@@ -36,7 +36,7 @@ jobs:
     if: needs.semantic.outputs.release_published == 'true'
     uses: ./.github/workflows/reusable-binaries.yaml
     with:
-      version: ${{ needs.semantic.outputs.new_version }}
+      version: v${{ needs.semantic.outputs.new_version }}
       commit_sha: ${{ github.sha }}
       binary_name: "x-ui-exporter"
       architectures: |
@@ -58,13 +58,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: x-ui-exporter-*
+          pattern: x-ui-exporter*
           merge-multiple: true
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ needs.semantic.outputs.new_version }}
+          tag_name: v${{ needs.semantic.outputs.new_version }}
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GH_RELEASE_PAT }}

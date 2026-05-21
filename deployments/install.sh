@@ -2,7 +2,7 @@
 
 # --- Global settings -----------------------
 GITHUB_REPO="PlushGuardian/3x-ui-exporter"
-SOURCE_BRANCH="install"
+SOURCE_BRANCH="main"
 
 # -------------------------------------------
 
